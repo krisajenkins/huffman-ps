@@ -1,7 +1,6 @@
 module Main where
 
-import Data.Unfoldable (unfoldr)
-import Data.Generic (class Generic, gShow, gEq)
+import Data.Generic (class Generic, gEq)
 import Prelude
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Console (CONSOLE, log)
@@ -12,7 +11,7 @@ import Data.List as List
 import Data.List (List(..),(:))
 import Data.Maybe (Maybe(..))
 import Data.Maybe as Maybe
-import Data.String (toCharArray)
+import Data.String (fromCharArray, toCharArray)
 import Data.Tuple (Tuple(Tuple))
 
 frequency :: String -> Map Char Int
@@ -34,8 +33,13 @@ data Tree
 derive instance genericTree :: Generic Tree
 
 instance showTree :: Show Tree where
-  show (Leaf k v) = show k <> " " <> show v
-  show (Branch l r) = show l <> "\n" <> show r
+  show = pretty ""
+
+pretty :: String -> Tree -> String
+pretty prefix (Leaf k v) = prefix <> show v <> ": " <> show k
+pretty prefix b@(Branch l r) = pretty newprefix l <> "\n" <> pretty whiteprefix r
+    where newprefix = prefix <> show (weight b) <> "--"
+          whiteprefix = fromCharArray $ const ' ' <$> toCharArray newprefix
 
 instance eqTree :: Eq Tree where
   eq = gEq
@@ -52,14 +56,13 @@ huffman xs =
   step $ List.sort xs
   where step Nil = Nothing
         step (Cons x Nil) = Just x
-        step (Cons x (Cons y ys)) = huffman (Branch x y : ys)
+        step (Cons x (Cons y ys)) = huffman $ if weight x < weight y then (Branch x y : ys) else (Branch y x : ys)
 
 main :: forall e. Eff (console :: CONSOLE | e) Unit
 main = do
-  log "Hello sailor!"
-  log $ show probabilities
-  log $ show $ huffman probabilities
+  log phrase
+  log $ case huffman probabilities of
+          Nothing -> "Empty"
+          Just ps -> show ps
   where phrase = "Donald Trump is just the best coder. Really great."
         probabilities = toTree $ frequency phrase
-        keyOf v = v.key
-        minKey m = keyOf <$> Map.findMin m
